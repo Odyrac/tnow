@@ -76,6 +76,7 @@ function formatTimeAgo($timestamp) {
             </form>
         </div>
 
+        <?php if (count($files) > 0): ?>
         <h3 class="mb-3 mt-5">Fichiers disponibles</h3>
         <div class="list-group">
             <?php foreach($files as $file): ?>
@@ -92,6 +93,7 @@ function formatTimeAgo($timestamp) {
                 </a>
             <?php endforeach; ?>
         </div>
+        <?php endif; ?>
     </div>
 
     <script>
