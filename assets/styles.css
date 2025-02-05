@@ -82,18 +82,22 @@ body {
     background: #f8f9fa;
     margin-bottom: 20px;
 }
+
 .drop-zone.dragover {
     background: #e9ecef;
     border-color: #0d6efd;
 }
+
 .file-time {
     font-size: 0.875em;
     color: #6c757d;
 }
+
 .file-info {
     display: flex;
     flex-direction: column;
 }
+
 @media (max-width: 576px) {
     .list-group-item {
         flex-direction: column;
