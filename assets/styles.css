@@ -88,6 +88,11 @@ body {
     border-color: #0d6efd;
 }
 
+.filename {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .file-time {
     font-size: 0.875em;
     color: #6c757d;
@@ -96,6 +101,7 @@ body {
 .file-info {
     display: flex;
     flex-direction: column;
+    width: 100%;
 }
 
 @media (max-width: 576px) {
