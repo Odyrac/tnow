@@ -6,6 +6,10 @@
 
 Cet outil vous permet de transférer rapidement des éléments de votre téléphone à votre ordinateur, ou inversement.
 
+<p align="center">
+    <img src="https://tnow.hlly.fr/assets/example.png" width="100%" alt="Example" style="border-radius: 30px;">
+</p>
+
 ## Code PIN
 
 Pour utiliser ce projet, ajoutez un fichier "./config.php".
