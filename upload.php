@@ -26,15 +26,15 @@ if (isset($_FILES['files'])) {
         $file_size = $_FILES['files']['size'][$key];
         $file_tmp = $_FILES['files']['tmp_name'][$key];
         $file_type = $_FILES['files']['type'][$key];
-        
+
         // Sécuriser le nom du fichier
         $file_name = preg_replace("/[^a-zA-Z0-9.]/", "_", $file_name);
-        
+
         // Vérifier si le fichier existe déjà et ajouter un timestamp si nécessaire
         if (file_exists($uploadDir . $file_name)) {
             $file_name = time() . '_' . $file_name;
         }
-        
+
         if (move_uploaded_file($file_tmp, $uploadDir . $file_name)) {
             $response[] = array(
                 'status' => 'success',
@@ -53,4 +53,3 @@ if (isset($_FILES['files'])) {
 
 header('Location: transfer.php');
 exit;
-?>

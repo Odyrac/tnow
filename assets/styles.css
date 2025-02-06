@@ -87,7 +87,7 @@ body {
 
 .drop-zone.dragover {
     background: #e9ecef;
-    border-color: #0d6efd;
+    border-color: var(--primary-color);
 }
 
 .filename {
@@ -119,4 +119,23 @@ body {
     .badge {
         margin-top: 0.5rem;
     }
+}
+
+
+
+.nav-tabs .nav-link {
+    color: #666;
+}
+
+.nav-tabs .nav-link.active {
+    font-weight: bold;
+}
+
+.tab-content {
+    padding: 20px 0;
+}
+
+#textContent {
+    min-height: 142px;
+    resize: vertical;
 }
