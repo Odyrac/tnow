@@ -19,12 +19,14 @@ if (!file_exists($uploadDir)) {
 }
 
 $content = trim($_POST['content']);
+$retention = isset($_POST['long_duration']) ? LONG_RETENTION : SHORT_RETENTION;
 
 if (isset($content) && !empty($content)) {
     $filename = date('Y-m-d_His') . '.tnow';
     $filepath = 'uploads/' . $filename;
 
     file_put_contents($filepath, $content);
+    setFileExpiry($filename, time() + $retention, $uploadDir);
 }
 
 header('Location: transfer.php');
