@@ -726,8 +726,17 @@ p {
 
 /* Le lien de téléchargement couvre tout l'élément */
 .tn-item-link {
+    display: block;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
     color: inherit;
+    font: inherit;
+    font-weight: 500;
+    text-align: left;
     text-decoration: none;
+    cursor: pointer;
 }
 
 .tn-item-link::after {

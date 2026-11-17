@@ -239,11 +239,18 @@ function renderRetentionSelect($id, $extraClass = '')
                         . '</span>';
                     ?>
                     <?php if ($isTextFile): ?>
-                        <div class="tn-item text-link" role="button" tabindex="0" draggable="false"
-                            data-content="<?php echo htmlspecialchars($content); ?>" <?php echo $dataAttrs; ?>>
+                        <?php $url = getHttpUrl($content); ?>
+                        <div class="tn-item" <?php echo $dataAttrs; ?>>
                             <div class="file-info">
-                                <span class="filename"><?php echo htmlspecialchars($content); ?></span>
+                                <button type="button" class="filename tn-item-link text-link" title="Copier"
+                                    data-content="<?php echo htmlspecialchars($content); ?>"><?php echo htmlspecialchars($content); ?></button>
                                 <?php echo $meta; ?>
+                            </div>
+                            <div class="tn-item-actions">
+                                <?php if ($url !== null): ?>
+                                    <a href="<?php echo htmlspecialchars($url); ?>" target="_blank" rel="noopener noreferrer" class="tn-btn tn-btn-view" draggable="false">Ouvrir</a>
+                                <?php endif; ?>
+                                <span class="tn-badge"><?php echo $url !== null ? 'Lien' : 'Texte'; ?></span>
                             </div>
                         </div>
                     <?php else: ?>
@@ -436,10 +443,10 @@ function renderRetentionSelect($id, $extraClass = '')
         });
 
         // --- Copie des textes ------------------------------------------------
-        document.querySelectorAll('.text-link').forEach(item => {
-            const copy = () => {
-                navigator.clipboard.writeText(item.dataset.content).then(() => {
-                    const fileTimeElement = item.querySelector('.file-time');
+        document.querySelectorAll('.text-link').forEach(button => {
+            button.addEventListener('click', () => {
+                navigator.clipboard.writeText(button.dataset.content).then(() => {
+                    const fileTimeElement = button.closest('.tn-item').querySelector('.file-time');
                     if (fileTimeElement.classList.contains('is-copied')) return;
                     const originalHTML = fileTimeElement.innerHTML;
                     fileTimeElement.classList.add('is-copied');
@@ -451,13 +458,6 @@ function renderRetentionSelect($id, $extraClass = '')
                         refreshTimes();
                     }, 2000);
                 });
-            };
-            item.addEventListener('click', copy);
-            item.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    copy();
-                }
             });
         });
 

@@ -316,3 +316,16 @@ function isViewableMimeType($mimeType)
 {
     return in_array($mimeType, VIEWABLE_MIME_TYPES, true);
 }
+
+// Renvoie l'URL si le texte est un unique lien http(s), sinon null
+function getHttpUrl($text)
+{
+    $text = trim($text);
+    if (preg_match('#^www\.#i', $text)) {
+        $text = 'https://' . $text;
+    }
+    if ($text === '' || preg_match('/\s/', $text) || !preg_match('#^https?://#i', $text)) {
+        return null;
+    }
+    return filter_var($text, FILTER_VALIDATE_URL) !== false ? $text : null;
+}
