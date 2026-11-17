@@ -19,7 +19,7 @@ if (!file_exists($uploadDir)) {
 }
 
 $errors = array();
-$retention = isset($_POST['long_duration']) ? LONG_RETENTION : SHORT_RETENTION;
+$retention = getRetentionSeconds(isset($_POST['retention']) ? $_POST['retention'] : null);
 $limits = getUploadLimits();
 
 // Quand le volume total dépasse post_max_size, PHP vide $_POST et $_FILES
@@ -57,7 +57,7 @@ if (isset($_FILES['files'])) {
         }
 
         if (move_uploaded_file($file_tmp, $uploadDir . $file_name)) {
-            setFileExpiry($file_name, time() + $retention, $uploadDir);
+            setFileExpiry($file_name, time() + $retention, $retention, $uploadDir);
         } else {
             $errors[] = $file_name . " : erreur lors de l'enregistrement sur le serveur";
         }

@@ -36,7 +36,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/styles.css">
     <link rel="icon" type="image/png" href="assets/logo.png" />
 </head>
@@ -44,32 +43,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <body>
     <div class="login-container">
         <div class="title-container">
-            <img src="assets/logo.png" alt="Logo" class="logo">
-            <h2 class="mb-0">Transfer Now</h2>
+            <img src="assets/logo.png" alt="Logo" class="logo" draggable="false">
+            <h2>Transfer Now</h2>
         </div>
         <form method="POST" id="loginForm">
-            <div class="mb-3">
-                <label for="pin" class="form-label">Entrez le code PIN :</label>
+            <div class="tn-field">
+                <label for="pin" class="tn-label">Entrez le code PIN :</label>
                 <input type="password"
-                    class="form-control"
+                    class="tn-input tn-pin"
                     id="pin"
                     name="pin"
                     maxlength="4"
                     pattern="[0-9]{4}"
                     inputmode="numeric"
+                    autocomplete="off"
                     onkeypress="return event.charCode >= 48 && event.charCode <= 57"
                     required
                     autofocus>
 
                 <?php if (isset($error)): ?>
-                    <div class="alert alert-danger mt-3"><?php echo $error; ?></div>
+                    <div class="tn-alert tn-pin-error"><?php echo $error; ?></div>
                 <?php endif; ?>
 
             </div>
-            <button type="submit" class="btn btn-primary w-100">Valider</button>
+            <button type="submit" class="tn-btn tn-btn-primary tn-btn-block">Valider</button>
         </form>
     </div>
 
+    <script src="assets/ui.js"></script>
     <script>
         document.getElementById('pin').addEventListener('keypress', function(event) {
             if (event.key === 'Enter') {

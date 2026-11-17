@@ -1,8 +1,40 @@
 <?php
 
 define('SHORT_RETENTION', 3600);
-define('LONG_RETENTION', 12 * 3600);
 const EXPIRY_META_FILE = '.expiry.json';
+
+// Durées de conservation proposées (clé envoyée par le formulaire => libellé + durée en secondes)
+const RETENTION_OPTIONS = array(
+    '1h' => array('label' => '1 heure', 'seconds' => 3600),
+    '12h' => array('label' => '12 heures', 'seconds' => 12 * 3600),
+    '1d' => array('label' => '1 jour', 'seconds' => 24 * 3600),
+    '3d' => array('label' => '3 jours', 'seconds' => 3 * 24 * 3600),
+);
+const DEFAULT_RETENTION = '1h';
+
+// Durée de conservation (en secondes) à partir de la clé reçue ; valeur par défaut si inconnue
+function getRetentionSeconds($key)
+{
+    $options = RETENTION_OPTIONS;
+    if (!is_string($key) || !isset($options[$key])) {
+        $key = DEFAULT_RETENTION;
+    }
+    return $options[$key]['seconds'];
+}
+
+// Libellé lisible d'une durée de conservation (ex : 43200 => "12 heures")
+function retentionLabel($seconds)
+{
+    foreach (RETENTION_OPTIONS as $option) {
+        if ($option['seconds'] === (int) $seconds) {
+            return $option['label'];
+        }
+    }
+    $hours = max(1, (int) round($seconds / 3600));
+    return $hours % 24 === 0
+        ? ($hours / 24) . ' jour' . ($hours / 24 > 1 ? 's' : '')
+        : $hours . ' heure' . ($hours > 1 ? 's' : '');
+}
 
 function loadExpiryMeta($directory = "uploads/")
 {
@@ -20,12 +52,32 @@ function saveExpiryMeta($meta, $directory = "uploads/")
     file_put_contents($directory . EXPIRY_META_FILE, json_encode($meta), LOCK_EX);
 }
 
-// Enregistre la date d'expiration d'un fichier (utilisé pour la rétention longue de 12h)
-function setFileExpiry($filename, $expiryTimestamp, $directory = "uploads/")
+// Enregistre la date d'expiration et la durée de conservation choisie pour un fichier
+function setFileExpiry($filename, $expiryTimestamp, $retentionSeconds, $directory = "uploads/")
 {
     $meta = loadExpiryMeta($directory);
-    $meta[$filename] = $expiryTimestamp;
+    $meta[$filename] = array('expires' => $expiryTimestamp, 'retention' => $retentionSeconds);
     saveExpiryMeta($meta, $directory);
+}
+
+// Expiration et durée de conservation d'un fichier.
+// Gère l'ancien format (timestamp seul) et les fichiers sans métadonnées (rétention courte).
+function getFileExpiry($meta, $basename, $filepath, $defaultRetention = SHORT_RETENTION)
+{
+    $entry = isset($meta[$basename]) ? $meta[$basename] : null;
+
+    if (is_array($entry) && isset($entry['expires'])) {
+        $expires = (int) $entry['expires'];
+        $retention = isset($entry['retention']) ? (int) $entry['retention'] : $expires - filemtime($filepath);
+    } elseif (is_numeric($entry)) {
+        $expires = (int) $entry;
+        $retention = $expires - filemtime($filepath);
+    } else {
+        $expires = filemtime($filepath) + $defaultRetention;
+        $retention = $defaultRetention;
+    }
+
+    return array('expires' => $expires, 'retention' => $retention);
 }
 
 function cleanOldFiles($directory = "uploads/", $maxAge = SHORT_RETENTION)
@@ -47,9 +99,9 @@ function cleanOldFiles($directory = "uploads/", $maxAge = SHORT_RETENTION)
                 continue;
             }
 
-            $expiry = isset($meta[$basename]) ? $meta[$basename] : (filemtime($file) + $maxAge);
+            $expiry = getFileExpiry($meta, $basename, $file, $maxAge);
 
-            if ($now > $expiry) {
+            if ($now > $expiry['expires']) {
                 if (unlink($file)) {
                     $deletedCount++;
                     if (isset($meta[$basename])) {
@@ -66,6 +118,84 @@ function cleanOldFiles($directory = "uploads/", $maxAge = SHORT_RETENTION)
     }
 
     return $deletedCount;
+}
+
+// Suppression "sans trace" d'un fichier : écrase le contenu avec des octets aléatoires,
+// force l'écriture sur disque, tronque, renomme avec un nom aléatoire puis supprime.
+function secureDelete($filepath)
+{
+    if (!is_file($filepath)) {
+        return false;
+    }
+
+    $size = filesize($filepath);
+    $handle = @fopen($filepath, 'r+b');
+
+    if ($handle !== false) {
+        $chunkSize = 1024 * 1024;
+        $remaining = $size;
+        while ($remaining > 0) {
+            $length = min($chunkSize, $remaining);
+            fwrite($handle, random_bytes($length));
+            $remaining -= $length;
+        }
+        fflush($handle);
+        if (function_exists('fsync')) {
+            fsync($handle);
+        }
+        ftruncate($handle, 0);
+        fclose($handle);
+    }
+
+    // Renommer avant suppression pour ne pas laisser le nom d'origine dans l'entrée du répertoire
+    $randomPath = dirname($filepath) . '/' . bin2hex(random_bytes(16));
+    if (@rename($filepath, $randomPath)) {
+        $filepath = $randomPath;
+    }
+
+    clearstatcache(true, $filepath);
+    return @unlink($filepath);
+}
+
+// Supprime définitivement tous les éléments du dossier d'upload et réinitialise les métadonnées
+function clearAllFiles($directory = "uploads/")
+{
+    if (!file_exists($directory)) {
+        return 0;
+    }
+
+    $deletedCount = 0;
+    foreach (scandir($directory) as $item) {
+        // On conserve les fichiers cachés système (.htaccess) ; les métadonnées sont traitées après
+        if ($item === '.' || $item === '..' || $item[0] === '.') {
+            continue;
+        }
+        if (is_file($directory . $item) && secureDelete($directory . $item)) {
+            $deletedCount++;
+        }
+    }
+
+    // Effacer aussi les métadonnées d'expiration (qui contiennent les noms des fichiers)
+    $metaFile = $directory . EXPIRY_META_FILE;
+    if (is_file($metaFile)) {
+        secureDelete($metaFile);
+    }
+
+    return $deletedCount;
+}
+
+// Jeton CSRF pour les actions sensibles (ex : tout supprimer)
+function getCsrfToken()
+{
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function checkCsrfToken($token)
+{
+    return is_string($token) && !empty($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
 
 // Fonction pour s'assurer que le nettoyage n'est pas exécuté trop fréquemment
