@@ -246,7 +246,7 @@ p {
     text-align: center;
 }
 
-/* --- Code PIN : 4 cases custom au-dessus d'un champ texte invisible ------ */
+/* --- Code PIN : zone custom au-dessus d'un champ texte invisible -------- */
 .tn-pin {
     position: relative;
 }
@@ -264,66 +264,76 @@ p {
     color: transparent;
     caret-color: transparent;
     font-size: 1px;
-    cursor: pointer;
+    cursor: text;
 }
 
 .tn-pin-input::selection {
     background: transparent;
 }
 
-.tn-pin-cells {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.75rem;
-}
-
-.tn-pin-cell {
-    position: relative;
+.tn-pin-display {
     height: 60px;
+    padding: 0 1.25rem;
     background: var(--surface);
     border: 1.5px solid transparent;
     border-radius: var(--radius);
     transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
 
-.tn-pin:hover .tn-pin-cell {
+.tn-pin:hover .tn-pin-display {
     background: var(--surface-strong);
 }
 
-.tn-pin-cell::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 12px;
-    height: 12px;
-    margin: -6px 0 0 -6px;
-    border-radius: 50%;
-    background: var(--ink);
-    transform: scale(0);
-    transition: transform 0.2s var(--ease);
-}
-
-.tn-pin-cell.is-filled::after {
-    transform: scale(1);
-}
-
-.tn-pin-cell.is-current {
+.tn-pin.is-focused .tn-pin-display {
     background: var(--secondary-color);
     border-color: var(--ink);
     box-shadow: var(--ring);
 }
 
-/* Curseur clignotant dans la case courante (vide) */
-.tn-pin-cell.is-current:not(.is-filled)::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
+.tn-pin-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 100%;
+    overflow: hidden;
+}
+
+.tn-pin-dots.is-overflowing {
+    justify-content: flex-end;
+}
+
+.tn-pin-dot {
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--ink);
+    animation: tn-dot-in 0.18s var(--ease);
+}
+
+@keyframes tn-dot-in {
+    from {
+        transform: scale(0);
+    }
+}
+
+/* Curseur clignotant, visible seulement quand le champ a le focus */
+.tn-pin-caret {
+    flex-shrink: 0;
     width: 1.5px;
     height: 22px;
-    margin: -11px 0 0 -0.75px;
+    margin-left: -4px;
     background: var(--ink);
+    visibility: hidden;
+}
+
+.tn-pin-dots .tn-pin-caret:first-child {
+    margin-left: 0;
+}
+
+.tn-pin.is-focused .tn-pin-caret {
+    visibility: visible;
     animation: tn-blink 1s steps(2, start) infinite;
 }
 

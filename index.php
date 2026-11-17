@@ -52,14 +52,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="tn-field">
                 <label for="pin" class="tn-label tn-label-center">Entrez le code PIN :</label>
                 <!-- Champ texte (pas "password") pour ne déclencher aucune suggestion de mot de passe ;
-                     l'affichage masqué est assuré par les cases ci-dessous -->
+                     l'affichage masqué (un point par caractère, sans longueur fixe) est assuré en dessous -->
                 <div class="tn-pin" id="pinBox">
                     <input type="text"
                         class="tn-pin-input"
                         id="pin"
                         name="pin"
-                        maxlength="4"
-                        pattern="[0-9]{4}"
                         inputmode="numeric"
                         autocomplete="off"
                         autocorrect="off"
@@ -71,11 +69,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         data-form-type="other"
                         required
                         autofocus>
-                    <div class="tn-pin-cells" aria-hidden="true">
-                        <span class="tn-pin-cell"></span>
-                        <span class="tn-pin-cell"></span>
-                        <span class="tn-pin-cell"></span>
-                        <span class="tn-pin-cell"></span>
+                    <div class="tn-pin-display" aria-hidden="true">
+                        <div class="tn-pin-dots" id="pinDots"><span class="tn-pin-caret"></span></div>
                     </div>
                 </div>
 
@@ -92,17 +87,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <script>
         const pinInput = document.getElementById('pin');
         const pinBox = document.getElementById('pinBox');
-        const pinCells = pinBox.querySelectorAll('.tn-pin-cell');
+        const pinDots = document.getElementById('pinDots');
+        const pinCaret = pinDots.querySelector('.tn-pin-caret');
 
-        // Affiche un point par chiffre saisi et met en évidence la case courante
+        // Un point par caractère saisi, quelle que soit la longueur du code
         function renderPin() {
-            pinInput.value = pinInput.value.replace(/[^0-9]/g, '').slice(0, 4);
             const length = pinInput.value.length;
-            const focused = document.activeElement === pinInput;
-            pinCells.forEach((cell, i) => {
-                cell.classList.toggle('is-filled', i < length);
-                cell.classList.toggle('is-current', focused && i === Math.min(length, 3));
-            });
+            const dots = pinDots.querySelectorAll('.tn-pin-dot');
+
+            for (let i = dots.length; i < length; i++) {
+                const dot = document.createElement('span');
+                dot.className = 'tn-pin-dot';
+                pinDots.insertBefore(dot, pinCaret);
+            }
+            for (let i = dots.length - 1; i >= length; i--) {
+                dots[i].remove();
+            }
+
+            pinBox.classList.toggle('is-focused', document.activeElement === pinInput);
+            // Si le code dépasse la largeur, on garde la fin (et le curseur) visible
+            pinDots.classList.toggle('is-overflowing', pinDots.scrollWidth > pinDots.clientWidth);
         }
 
         pinInput.addEventListener('input', renderPin);
@@ -115,10 +119,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         });
         renderPin();
 
-        pinInput.addEventListener('keypress', function(event) {
+        pinInput.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
-                if (this.value.length === 4) {
+                if (this.value.length > 0) {
                     document.getElementById('loginForm').submit();
                 }
             }
