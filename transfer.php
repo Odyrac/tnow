@@ -84,7 +84,7 @@ function formatRemaining($seconds)
     if ($seconds <= 60) {
         return "moins d'1 min";
     }
-    if ($seconds < 3600) {
+    if ($seconds <= 59 * 60) {
         return ceil($seconds / 60) . " min";
     }
     if ($seconds < 3 * 3600) {
@@ -118,14 +118,18 @@ function formatSize($bytes)
 }
 
 // Select custom de durée de conservation
-function renderRetentionSelect($id)
+function renderRetentionSelect($id, $extraClass = '')
 {
     $options = RETENTION_OPTIONS;
     $default = DEFAULT_RETENTION;
     ob_start(); ?>
-    <div class="tn-select" data-sync="retention">
+    <div class="tn-select <?php echo $extraClass; ?>" data-sync="retention">
         <input type="hidden" name="retention" value="<?php echo $default; ?>">
         <button type="button" class="tn-select-trigger" id="<?php echo $id; ?>" aria-haspopup="listbox" aria-expanded="false">
+            <svg class="tn-select-clock" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.5" />
+                <path d="M8 4.75V8l2.25 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
             <span class="tn-select-label">Conserver</span>
             <span class="tn-select-value"><?php echo htmlspecialchars($options[$default]['label']); ?></span>
             <span class="tn-select-icon" aria-hidden="true"></span>
@@ -143,10 +147,11 @@ function renderRetentionSelect($id)
 ?>
 
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="tn-preload">
 
 <head>
     <meta charset="UTF-8">
+    <?php echo renderLoaderHead(); ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transfer Now</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -157,6 +162,7 @@ function renderRetentionSelect($id)
 </head>
 
 <body>
+    <?php echo renderLoader(); ?>
     <div class="login-container other-container">
         <div class="title-container">
             <img src="assets/logo.png" alt="Logo" class="logo" draggable="false">
@@ -182,8 +188,8 @@ function renderRetentionSelect($id)
             <div class="drop-zone" id="dropZone">
                 <form action="upload.php" method="POST" enctype="multipart/form-data" id="uploadForm">
                     <p class="drop-zone-title">Glissez-déposez vos fichiers ici</p>
-                    <?php echo renderRetentionSelect('retentionFiles'); ?>
-                    <div class="tn-file" id="filePicker" style="margin-top: 0.75rem;">
+                    <?php echo renderRetentionSelect('retentionFiles', 'tn-select--center'); ?>
+                    <div class="tn-file" id="filePicker">
                         <input type="file" name="files[]" id="fileInput" multiple class="tn-visually-hidden">
                         <label for="fileInput" class="tn-btn tn-btn-primary tn-file-trigger">Sélectionner des fichiers</label>
                         <span class="tn-file-summary" id="fileSummary">Envoi automatique dès la sélection</span>
@@ -459,7 +465,7 @@ function renderRetentionSelect($id)
 
         function formatRemaining(seconds) {
             if (seconds <= 60) return "moins d'1 min";
-            if (seconds < 3600) return `${Math.ceil(seconds / 60)} min`;
+            if (seconds <= 59 * 60) return `${Math.ceil(seconds / 60)} min`;
             if (seconds < 3 * 3600) {
                 let hours = Math.floor(seconds / 3600);
                 let minutes = Math.round((seconds % 3600) / 60 / 5) * 5;

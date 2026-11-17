@@ -262,3 +262,24 @@ function uploadErrorMessage($errorCode)
             return "erreur inconnue lors de l'upload";
     }
 }
+
+// Styles critiques du loader : inline dans le <head> pour s'afficher avant le chargement de styles.css
+function renderLoaderHead()
+{
+    return '<style>'
+        . 'html{background:#000}'
+        . 'html.tn-preload *,html.tn-preload *::before,html.tn-preload *::after{transition:none!important}'
+        . '#tn-loader{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#000;'
+        . 'transition:opacity .35s ease,visibility 0s linear .35s!important}'
+        . '#tn-loader.is-done{opacity:0;visibility:hidden}'
+        . '.tn-loader-spinner{width:28px;height:28px;border:2px solid rgba(255,255,255,.15);border-top-color:#fff;border-radius:50%;'
+        . 'animation:tn-spin .7s linear infinite}'
+        . '@keyframes tn-spin{to{transform:rotate(360deg)}}'
+        . '</style>';
+}
+
+// Écran de chargement, masqué par assets/ui.js une fois la page prête
+function renderLoader()
+{
+    return '<div id="tn-loader" aria-hidden="true"><div class="tn-loader-spinner"></div></div>';
+}

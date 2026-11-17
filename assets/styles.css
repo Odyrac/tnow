@@ -242,11 +242,95 @@ p {
     font-weight: 500;
 }
 
-.tn-pin {
+.tn-label-center {
     text-align: center;
-    font-size: 1.5rem;
-    letter-spacing: 0.75em;
-    padding-left: calc(1rem + 0.75em);
+}
+
+/* --- Code PIN : 4 cases custom au-dessus d'un champ texte invisible ------ */
+.tn-pin {
+    position: relative;
+}
+
+.tn-pin-input {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: transparent;
+    caret-color: transparent;
+    font-size: 1px;
+    cursor: pointer;
+}
+
+.tn-pin-input::selection {
+    background: transparent;
+}
+
+.tn-pin-cells {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+}
+
+.tn-pin-cell {
+    position: relative;
+    height: 60px;
+    background: var(--surface);
+    border: 1.5px solid transparent;
+    border-radius: var(--radius);
+    transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.tn-pin:hover .tn-pin-cell {
+    background: var(--surface-strong);
+}
+
+.tn-pin-cell::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    border-radius: 50%;
+    background: var(--ink);
+    transform: scale(0);
+    transition: transform 0.2s var(--ease);
+}
+
+.tn-pin-cell.is-filled::after {
+    transform: scale(1);
+}
+
+.tn-pin-cell.is-current {
+    background: var(--secondary-color);
+    border-color: var(--ink);
+    box-shadow: var(--ring);
+}
+
+/* Curseur clignotant dans la case courante (vide) */
+.tn-pin-cell.is-current:not(.is-filled)::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.5px;
+    height: 22px;
+    margin: -11px 0 0 -0.75px;
+    background: var(--ink);
+    animation: tn-blink 1s steps(2, start) infinite;
+}
+
+@keyframes tn-blink {
+    to {
+        visibility: hidden;
+    }
 }
 
 .tn-field {
@@ -382,13 +466,14 @@ p {
 
 .tn-form-row {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 0.75rem;
     margin-top: 1rem;
 }
 
-.tn-form-row .tn-select {
-    flex: 1;
-    min-width: 0;
+.drop-zone .tn-select {
+    margin-bottom: 1rem;
 }
 
 /* --- Sélecteur de fichiers ----------------------------------------------- */
@@ -446,56 +531,66 @@ p {
     font-weight: 500;
 }
 
-/* --- Select custom ------------------------------------------------------- */
+/* --- Select custom (pastille) ------------------------------------------ */
 .tn-select {
     position: relative;
+    display: inline-block;
     text-align: left;
 }
 
 .tn-select-trigger {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 0.75rem;
-    width: 100%;
-    height: 44px;
-    padding: 0 1rem;
-    background: var(--secondary-color);
-    border: 1.5px solid var(--line);
-    border-radius: var(--radius);
+    gap: 0.5rem;
+    height: 38px;
+    padding: 0 0.95rem 0 0.8rem;
+    background: var(--primary-color);
+    color: var(--secondary-color);
+    border: 0;
+    border-radius: 999px;
     cursor: pointer;
-    text-align: left;
-    transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+    white-space: nowrap;
+    transition: background-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.12s var(--ease);
 }
 
 .tn-select-trigger:hover {
-    border-color: #cfcfcf;
+    background: var(--accent-color);
+}
+
+.tn-select-trigger:active {
+    transform: scale(0.97);
 }
 
 .tn-select-trigger:focus-visible,
 .tn-select.is-open .tn-select-trigger {
     outline: none;
-    border-color: var(--ink);
     box-shadow: var(--ring);
+}
+
+.tn-select-clock {
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    opacity: 0.7;
 }
 
 .tn-select-label {
     font-size: 0.85rem;
-    color: var(--muted);
-    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .tn-select-value {
-    margin-left: auto;
+    font-size: 0.9rem;
     font-weight: 600;
-    white-space: nowrap;
 }
 
 /* Indicateur "+ / −" (pas de chevron) */
 .tn-select-icon {
     position: relative;
     flex-shrink: 0;
-    width: 10px;
-    height: 10px;
+    width: 9px;
+    height: 9px;
+    margin-left: 0.15rem;
 }
 
 .tn-select-icon::before,
@@ -507,7 +602,7 @@ p {
     width: 100%;
     height: 1.5px;
     margin-top: -0.75px;
-    background: var(--ink);
+    background: var(--secondary-color);
     border-radius: 2px;
     transition: transform 0.25s var(--ease);
 }
@@ -523,7 +618,7 @@ p {
 .tn-select-menu {
     position: absolute;
     left: 0;
-    right: 0;
+    width: 190px;
     top: calc(100% + 6px);
     z-index: 30;
     margin: 0;
@@ -538,6 +633,10 @@ p {
     transform: translateY(-6px) scale(0.98);
     transform-origin: top center;
     transition: opacity 0.16s var(--ease), transform 0.16s var(--ease), visibility 0s linear 0.16s;
+}
+
+.tn-select--center .tn-select-menu {
+    left: calc(50% - 95px);
 }
 
 .tn-select.is-up .tn-select-menu {
@@ -663,6 +762,11 @@ p {
 
     .tn-form-row {
         flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tn-form-row .tn-select {
+        align-self: center;
     }
 
     .tn-item {

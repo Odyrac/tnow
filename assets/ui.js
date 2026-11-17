@@ -311,5 +311,29 @@
     // Scrollbar de la page, partout
     scrollbar(document.scrollingElement || document.documentElement, document.body);
 
+    // --- Loader : on révèle la page une fois CSS, images et polices chargées
+    let revealed = false;
+    function reveal() {
+        if (revealed) return;
+        revealed = true;
+        // Force le calcul des styles finaux (sans transition) avant de réactiver les animations
+        void document.body.offsetHeight;
+        document.documentElement.classList.remove('tn-preload');
+        const loader = document.getElementById('tn-loader');
+        if (loader) loader.classList.add('is-done');
+    }
+
+    const pageLoaded = new Promise((resolve) => {
+        if (document.readyState === 'complete') resolve();
+        else window.addEventListener('load', resolve, { once: true });
+    });
+    Promise.all([pageLoaded, document.fonts ? document.fonts.ready : null]).then(reveal, reveal);
+    setTimeout(reveal, 5000); // Filet de sécurité
+
+    // Retour arrière (cache du navigateur) : la page ne doit pas rester masquée
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted) reveal();
+    });
+
     window.TN = { scrollbar: scrollbar, tabs: tabs, select: select, modal: modal };
 })();

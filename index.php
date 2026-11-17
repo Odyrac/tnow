@@ -27,10 +27,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 ?>
 
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="tn-preload">
 
 <head>
     <meta charset="UTF-8">
+    <?php echo renderLoaderHead(); ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transfer Now</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,6 +42,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 
 <body>
+    <?php echo renderLoader(); ?>
     <div class="login-container">
         <div class="title-container">
             <img src="assets/logo.png" alt="Logo" class="logo" draggable="false">
@@ -48,18 +50,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
         <form method="POST" id="loginForm">
             <div class="tn-field">
-                <label for="pin" class="tn-label">Entrez le code PIN :</label>
-                <input type="password"
-                    class="tn-input tn-pin"
-                    id="pin"
-                    name="pin"
-                    maxlength="4"
-                    pattern="[0-9]{4}"
-                    inputmode="numeric"
-                    autocomplete="off"
-                    onkeypress="return event.charCode >= 48 && event.charCode <= 57"
-                    required
-                    autofocus>
+                <label for="pin" class="tn-label tn-label-center">Entrez le code PIN :</label>
+                <!-- Champ texte (pas "password") pour ne déclencher aucune suggestion de mot de passe ;
+                     l'affichage masqué est assuré par les cases ci-dessous -->
+                <div class="tn-pin" id="pinBox">
+                    <input type="text"
+                        class="tn-pin-input"
+                        id="pin"
+                        name="pin"
+                        maxlength="4"
+                        pattern="[0-9]{4}"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-bwignore="true"
+                        data-form-type="other"
+                        required
+                        autofocus>
+                    <div class="tn-pin-cells" aria-hidden="true">
+                        <span class="tn-pin-cell"></span>
+                        <span class="tn-pin-cell"></span>
+                        <span class="tn-pin-cell"></span>
+                        <span class="tn-pin-cell"></span>
+                    </div>
+                </div>
 
                 <?php if (isset($error)): ?>
                     <div class="tn-alert tn-pin-error"><?php echo $error; ?></div>
@@ -72,7 +90,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <script src="assets/ui.js"></script>
     <script>
-        document.getElementById('pin').addEventListener('keypress', function(event) {
+        const pinInput = document.getElementById('pin');
+        const pinBox = document.getElementById('pinBox');
+        const pinCells = pinBox.querySelectorAll('.tn-pin-cell');
+
+        // Affiche un point par chiffre saisi et met en évidence la case courante
+        function renderPin() {
+            pinInput.value = pinInput.value.replace(/[^0-9]/g, '').slice(0, 4);
+            const length = pinInput.value.length;
+            const focused = document.activeElement === pinInput;
+            pinCells.forEach((cell, i) => {
+                cell.classList.toggle('is-filled', i < length);
+                cell.classList.toggle('is-current', focused && i === Math.min(length, 3));
+            });
+        }
+
+        pinInput.addEventListener('input', renderPin);
+        pinInput.addEventListener('focus', renderPin);
+        pinInput.addEventListener('blur', renderPin);
+        // Curseur toujours en fin de saisie
+        pinInput.addEventListener('select', () => {
+            const end = pinInput.value.length;
+            pinInput.setSelectionRange(end, end);
+        });
+        renderPin();
+
+        pinInput.addEventListener('keypress', function(event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 if (this.value.length === 4) {
