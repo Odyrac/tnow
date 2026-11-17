@@ -720,6 +720,56 @@ p {
     box-shadow: var(--ring);
 }
 
+.tn-item {
+    position: relative;
+}
+
+/* Le lien de téléchargement couvre tout l'élément */
+.tn-item-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.tn-item-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+}
+
+.tn-item-link:focus-visible {
+    outline: none;
+}
+
+.tn-item:focus-within:has(.tn-item-link:focus-visible) {
+    box-shadow: var(--ring);
+}
+
+.tn-item-actions {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.tn-btn-view {
+    height: 30px;
+    padding: 0 0.85rem;
+    font-size: 0.8rem;
+    border-radius: 999px;
+    background: var(--secondary-color);
+    border-color: var(--line);
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.tn-btn-view:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+}
+
 .file-info {
     display: flex;
     flex-direction: column;

@@ -247,14 +247,23 @@ function renderRetentionSelect($id, $extraClass = '')
                             </div>
                         </div>
                     <?php else: ?>
-                        <a href="download.php?file=<?php echo urlencode($file['name']); ?>" target="_blank" draggable="false"
-                            class="tn-item" <?php echo $dataAttrs; ?>>
+                        <?php
+                        $fileUrl = 'download.php?file=' . urlencode($file['name']);
+                        $viewable = isViewableMimeType(getFileMimeType($directory . $file['name']));
+                        ?>
+                        <div class="tn-item" <?php echo $dataAttrs; ?>>
                             <div class="file-info">
-                                <span class="filename"><?php echo htmlspecialchars($file['name']); ?></span>
+                                <a href="<?php echo $fileUrl; ?>" download class="filename tn-item-link" draggable="false"
+                                    title="Télécharger"><?php echo htmlspecialchars($file['name']); ?></a>
                                 <?php echo $meta; ?>
                             </div>
-                            <span class="tn-badge"><?php echo formatSize(filesize($directory . $file['name'])); ?></span>
-                        </a>
+                            <div class="tn-item-actions">
+                                <?php if ($viewable): ?>
+                                    <a href="<?php echo $fileUrl; ?>&amp;view=1" target="_blank" rel="noopener" class="tn-btn tn-btn-view" draggable="false">Voir</a>
+                                <?php endif; ?>
+                                <span class="tn-badge"><?php echo formatSize(filesize($directory . $file['name'])); ?></span>
+                            </div>
+                        </div>
                     <?php endif; ?>
                 <?php endforeach; ?>
             </div>

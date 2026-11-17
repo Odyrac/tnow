@@ -23,13 +23,21 @@ if (!is_file($filepath)) {
     die("Fichier introuvable");
 }
 
-$finfo = finfo_open(FILEINFO_MIME_TYPE);
-$mimeType = finfo_file($finfo, $filepath) ?: 'application/octet-stream';
-finfo_close($finfo);
+$mimeType = getFileMimeType($filepath);
+
+// Par défaut : téléchargement. Affichage dans le navigateur uniquement sur demande (?view=1)
+// et seulement pour les types sûrs.
+$inline = isset($_GET['view']) && isViewableMimeType($mimeType);
+
+if (!$inline) {
+    $mimeType = 'application/octet-stream';
+} elseif ($mimeType === 'text/plain') {
+    $mimeType = 'text/plain; charset=utf-8';
+}
 
 header('Content-Type: ' . $mimeType);
 header('Content-Length: ' . filesize($filepath));
-header('Content-Disposition: inline; filename="' . $filename . '"');
+header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"; filename*=UTF-8\'\'' . rawurlencode($filename));
 header('X-Content-Type-Options: nosniff');
 
 readfile($filepath);

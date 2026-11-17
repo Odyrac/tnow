@@ -283,3 +283,36 @@ function renderLoader()
 {
     return '<div id="tn-loader" aria-hidden="true"><div class="tn-loader-spinner"></div></div>';
 }
+
+// Types MIME que le navigateur sait afficher sans risque (pas de HTML ni de SVG, qui pourraient exécuter du script)
+const VIEWABLE_MIME_TYPES = array(
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp',
+    'image/avif',
+    'image/bmp',
+    'text/plain',
+    'video/mp4',
+    'video/webm',
+    'audio/mpeg',
+    'audio/ogg',
+    'audio/wav',
+    'audio/x-wav',
+    'audio/webm',
+    'audio/mp4',
+);
+
+function getFileMimeType($filepath)
+{
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $filepath) ?: 'application/octet-stream';
+    finfo_close($finfo);
+    return $mimeType;
+}
+
+function isViewableMimeType($mimeType)
+{
+    return in_array($mimeType, VIEWABLE_MIME_TYPES, true);
+}
