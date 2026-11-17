@@ -268,6 +268,10 @@ function renderLoaderHead()
 {
     return '<style>'
         . 'html{background:#000}'
+        // Scrollbars natives masquées dès le premier rendu (avant styles.css)
+        . '*{scrollbar-width:none;-ms-overflow-style:none}*::-webkit-scrollbar{display:none;width:0;height:0}'
+        // Pendant le chargement : pas de défilement ni de scrollbar custom
+        . 'html.tn-preload{overflow:hidden}html.tn-preload .tn-scrollbar{display:none!important}'
         . 'html.tn-preload *,html.tn-preload *::before,html.tn-preload *::after{transition:none!important}'
         . '#tn-loader{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#000;'
         . 'transition:opacity .35s ease,visibility 0s linear .35s!important}'

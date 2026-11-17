@@ -321,6 +321,8 @@
         document.documentElement.classList.remove('tn-preload');
         const loader = document.getElementById('tn-loader');
         if (loader) loader.classList.add('is-done');
+        // Les scrollbars custom étaient masquées : on recalcule leurs dimensions
+        window.dispatchEvent(new Event('resize'));
     }
 
     const pageLoaded = new Promise((resolve) => {
