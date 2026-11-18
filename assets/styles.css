@@ -246,101 +246,14 @@ p {
     text-align: center;
 }
 
-/* --- Code PIN : zone custom au-dessus d'un champ texte invisible -------- */
-.tn-pin {
-    position: relative;
-}
-
+/* --- Code PIN : champ texte masqué (pas de "password" => aucune suggestion) */
 .tn-pin-input {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    border: 0;
-    outline: none;
-    background: transparent;
-    color: transparent;
-    caret-color: transparent;
-    font-size: 1px;
-    cursor: text;
-}
-
-.tn-pin-input::selection {
-    background: transparent;
-}
-
-.tn-pin-display {
     height: 60px;
-    padding: 0 1.25rem;
-    background: var(--surface);
-    border: 1.5px solid transparent;
-    border-radius: var(--radius);
-    transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
-}
-
-.tn-pin:hover .tn-pin-display {
-    background: var(--surface-strong);
-}
-
-.tn-pin.is-focused .tn-pin-display {
-    background: var(--secondary-color);
-    border-color: var(--ink);
-    box-shadow: var(--ring);
-}
-
-.tn-pin-dots {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    height: 100%;
-    overflow: hidden;
-}
-
-.tn-pin-dots.is-overflowing {
-    justify-content: flex-end;
-}
-
-.tn-pin-dot {
-    flex-shrink: 0;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--ink);
-    animation: tn-dot-in 0.18s var(--ease);
-}
-
-@keyframes tn-dot-in {
-    from {
-        transform: scale(0);
-    }
-}
-
-/* Curseur clignotant, visible seulement quand le champ a le focus */
-.tn-pin-caret {
-    flex-shrink: 0;
-    width: 1.5px;
-    height: 22px;
-    margin-left: -4px;
-    background: var(--ink);
-    visibility: hidden;
-}
-
-.tn-pin-dots .tn-pin-caret:first-child {
-    margin-left: 0;
-}
-
-.tn-pin.is-focused .tn-pin-caret {
-    visibility: visible;
-    animation: tn-blink 1s steps(2, start) infinite;
-}
-
-@keyframes tn-blink {
-    to {
-        visibility: hidden;
-    }
+    text-align: center;
+    /* >= 16px : évite le zoom automatique d'iOS au focus */
+    font-size: 1.25rem;
+    letter-spacing: 0.3em;
+    -webkit-text-security: disc;
 }
 
 .tn-field {

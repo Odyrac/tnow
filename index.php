@@ -52,27 +52,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="tn-field">
                 <label for="pin" class="tn-label tn-label-center">Entrez le code PIN :</label>
                 <!-- Champ texte (pas "password") pour ne déclencher aucune suggestion de mot de passe ;
-                     l'affichage masqué (un point par caractère, sans longueur fixe) est assuré en dessous -->
-                <div class="tn-pin" id="pinBox">
-                    <input type="text"
-                        class="tn-pin-input"
-                        id="pin"
-                        name="pin"
-                        inputmode="numeric"
-                        autocomplete="off"
-                        autocorrect="off"
-                        autocapitalize="off"
-                        spellcheck="false"
-                        data-lpignore="true"
-                        data-1p-ignore="true"
-                        data-bwignore="true"
-                        data-form-type="other"
-                        required
-                        autofocus>
-                    <div class="tn-pin-display" aria-hidden="true">
-                        <div class="tn-pin-dots" id="pinDots"><span class="tn-pin-caret"></span></div>
-                    </div>
-                </div>
+                     le masquage est assuré en CSS (-webkit-text-security) -->
+                <input type="text"
+                    class="tn-input tn-pin-input"
+                    id="pin"
+                    name="pin"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-bwignore="true"
+                    data-form-type="other"
+                    required
+                    autofocus>
 
                 <?php if (isset($error)): ?>
                     <div class="tn-alert tn-pin-error"><?php echo $error; ?></div>
@@ -85,48 +80,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <script src="assets/ui.js"></script>
     <script>
-        const pinInput = document.getElementById('pin');
-        const pinBox = document.getElementById('pinBox');
-        const pinDots = document.getElementById('pinDots');
-        const pinCaret = pinDots.querySelector('.tn-pin-caret');
-
-        // Un point par caractère saisi, quelle que soit la longueur du code
-        function renderPin() {
-            const length = pinInput.value.length;
-            const dots = pinDots.querySelectorAll('.tn-pin-dot');
-
-            for (let i = dots.length; i < length; i++) {
-                const dot = document.createElement('span');
-                dot.className = 'tn-pin-dot';
-                pinDots.insertBefore(dot, pinCaret);
-            }
-            for (let i = dots.length - 1; i >= length; i--) {
-                dots[i].remove();
-            }
-
-            pinBox.classList.toggle('is-focused', document.activeElement === pinInput);
-            // Si le code dépasse la largeur, on garde la fin (et le curseur) visible
-            pinDots.classList.toggle('is-overflowing', pinDots.scrollWidth > pinDots.clientWidth);
+        // Navigateurs sans -webkit-text-security : repli sur un vrai champ masqué
+        if (!CSS.supports('-webkit-text-security', 'disc')) {
+            document.getElementById('pin').type = 'password';
         }
-
-        pinInput.addEventListener('input', renderPin);
-        pinInput.addEventListener('focus', renderPin);
-        pinInput.addEventListener('blur', renderPin);
-        // Curseur toujours en fin de saisie
-        pinInput.addEventListener('select', () => {
-            const end = pinInput.value.length;
-            pinInput.setSelectionRange(end, end);
-        });
-        renderPin();
-
-        pinInput.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                if (this.value.length > 0) {
-                    document.getElementById('loginForm').submit();
-                }
-            }
-        });
     </script>
 </body>
 
