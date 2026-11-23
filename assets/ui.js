@@ -169,6 +169,10 @@
             input.value = value;
             valueEl.textContent = option.textContent.trim();
             options.forEach(o => o.setAttribute('aria-selected', o === option ? 'true' : 'false'));
+            // Choix de l'utilisateur : on notifie (une seule fois, pas pour les selects synchronisés)
+            if (propagate) {
+                root.dispatchEvent(new CustomEvent('tn:change', { detail: { value: value } }));
+            }
             if (propagate && root.dataset.sync) {
                 selects.forEach(s => {
                     if (s.root !== root && s.root.dataset.sync === root.dataset.sync) {

@@ -19,14 +19,23 @@ if (!file_exists($uploadDir)) {
 }
 
 $content = trim($_POST['content']);
-$retention = getRetentionSeconds(isset($_POST['retention']) ? $_POST['retention'] : null);
+$retentionKey = isset($_POST['retention']) ? $_POST['retention'] : null;
+rememberRetentionKey($retentionKey);
+$retention = getRetentionSeconds($retentionKey);
 
 if (isset($content) && !empty($content)) {
-    $filename = date('Y-m-d_His') . '.tnow';
-    $filepath = 'uploads/' . $filename;
+    $lock = acquireStorageLock($uploadDir);
+    $available = STORAGE_QUOTA - getStoredBytes($uploadDir) - getPendingBytes($uploadDir);
 
-    file_put_contents($filepath, $content);
-    setFileExpiry($filename, time() + $retention, $retention, $uploadDir);
+    if (strlen($content) > $available) {
+        $_SESSION['upload_errors'] = array("Espace insuffisant pour enregistrer ce texte (" . formatMegabytes(max(0, $available)) . " disponibles sur " . formatMegabytes(STORAGE_QUOTA) . ").");
+    } else {
+        $filename = uniqueUploadName(date('Y-m-d_His') . '.tnow', $uploadDir);
+        file_put_contents($uploadDir . $filename, $content);
+        setFileExpiry($filename, time() + $retention, $retention, $uploadDir);
+    }
+
+    releaseStorageLock($lock);
 }
 
 header('Location: transfer.php');

@@ -12,6 +12,17 @@ const RETENTION_OPTIONS = array(
 );
 const DEFAULT_RETENTION = '1h';
 
+// Espace maximal occupé par l'ensemble des éléments stockés (fichiers + textes)
+const STORAGE_QUOTA = 500 * 1024 * 1024;
+// Taille maximale d'un morceau d'envoi : les gros fichiers sont découpés pour rester
+// sous les limites du serveur (upload_max_filesize, post_max_size, serveur web)
+const CHUNK_MAX_SIZE = 8 * 1024 * 1024;
+// Dossier caché (dans uploads/) des envois en cours
+const CHUNKS_DIR = '.chunks';
+// Un envoi sans activité depuis ce délai est considéré comme abandonné et effacé
+const STALE_CHUNK_AGE = 3600;
+const STORAGE_LOCK_FILE = '.storage.lock';
+
 // Durée de conservation (en secondes) à partir de la clé reçue ; valeur par défaut si inconnue
 function getRetentionSeconds($key)
 {
@@ -20,6 +31,23 @@ function getRetentionSeconds($key)
         $key = DEFAULT_RETENTION;
     }
     return $options[$key]['seconds'];
+}
+
+// Durée de conservation choisie pendant la session (réinitialisée à la déconnexion)
+function getSessionRetentionKey()
+{
+    $options = RETENTION_OPTIONS;
+    $key = isset($_SESSION['retention']) ? $_SESSION['retention'] : null;
+    return is_string($key) && isset($options[$key]) ? $key : DEFAULT_RETENTION;
+}
+
+// Mémorise la durée choisie dans la session si elle est valide
+function rememberRetentionKey($key)
+{
+    $options = RETENTION_OPTIONS;
+    if (is_string($key) && isset($options[$key])) {
+        $_SESSION['retention'] = $key;
+    }
 }
 
 // Libellé lisible d'une durée de conservation (ex : 43200 => "12 heures")
@@ -117,7 +145,164 @@ function cleanOldFiles($directory = "uploads/", $maxAge = SHORT_RETENTION)
         saveExpiryMeta($meta, $directory);
     }
 
+    cleanStaleChunks($directory);
+
     return $deletedCount;
+}
+
+// --- Envoi par morceaux et quota de stockage ----------------------------------
+
+// Taille des morceaux : sous les limites PHP (avec une marge pour l'enveloppe multipart)
+function getChunkSize()
+{
+    $limits = getUploadLimits();
+    $size = CHUNK_MAX_SIZE;
+    if ($limits['file'] > 0) {
+        $size = min($size, $limits['file']);
+    }
+    if ($limits['post'] > 0) {
+        $size = min($size, $limits['post'] - 64 * 1024);
+    }
+    return max(256 * 1024, $size);
+}
+
+// Nom de fichier sûr : caractères simples, pas de fichier caché, longueur limitée
+function sanitizeUploadName($name)
+{
+    $name = preg_replace("/[^a-zA-Z0-9.]/", "_", (string) $name);
+    $name = ltrim($name, '.');
+    if (strlen($name) > 200) {
+        $name = substr($name, -200);
+    }
+    return $name !== '' ? $name : 'fichier';
+}
+
+// Nom libre dans le dossier d'upload (préfixe horodaté en cas de doublon)
+function uniqueUploadName($name, $directory = "uploads/")
+{
+    if (!file_exists($directory . $name)) {
+        return $name;
+    }
+    $prefix = time();
+    $candidate = $prefix . '_' . $name;
+    $i = 1;
+    while (file_exists($directory . $candidate)) {
+        $candidate = $prefix . '_' . $i++ . '_' . $name;
+    }
+    return $candidate;
+}
+
+// Volume occupé par les éléments terminés (fichiers visibles du dossier)
+function getStoredBytes($directory = "uploads/")
+{
+    $total = 0;
+    if (!is_dir($directory)) {
+        return 0;
+    }
+    foreach (scandir($directory) as $item) {
+        if ($item[0] !== '.' && is_file($directory . $item)) {
+            $total += filesize($directory . $item);
+        }
+    }
+    return $total;
+}
+
+function getChunksRoot($directory = "uploads/")
+{
+    return $directory . CHUNKS_DIR . '/';
+}
+
+// Liste des envois en cours : identifiant => chemin du dossier
+function listChunkUploads($directory = "uploads/")
+{
+    $root = getChunksRoot($directory);
+    $uploads = array();
+    if (!is_dir($root)) {
+        return $uploads;
+    }
+    foreach (scandir($root) as $item) {
+        if ($item[0] !== '.' && is_dir($root . $item)) {
+            $uploads[$item] = $root . $item . '/';
+        }
+    }
+    return $uploads;
+}
+
+function loadChunkMeta($chunkDir)
+{
+    $file = $chunkDir . 'meta.json';
+    if (!is_file($file)) {
+        return null;
+    }
+    $meta = json_decode(file_get_contents($file), true);
+    return is_array($meta) ? $meta : null;
+}
+
+// Place réservée par les envois en cours (taille annoncée des fichiers)
+function getPendingBytes($directory = "uploads/")
+{
+    $total = 0;
+    foreach (listChunkUploads($directory) as $chunkDir) {
+        $meta = loadChunkMeta($chunkDir);
+        if ($meta !== null) {
+            $total += (int) $meta['size'];
+        }
+    }
+    return $total;
+}
+
+// Supprime un envoi en cours (morceaux + métadonnées)
+function removeChunkUpload($chunkDir, $secure = false)
+{
+    if (!is_dir($chunkDir)) {
+        return;
+    }
+    foreach (scandir($chunkDir) as $item) {
+        if ($item !== '.' && $item !== '..' && is_file($chunkDir . $item)) {
+            $secure ? secureDelete($chunkDir . $item) : @unlink($chunkDir . $item);
+        }
+    }
+    @rmdir($chunkDir);
+}
+
+// Efface les envois abandonnés (onglet fermé, connexion perdue...)
+function cleanStaleChunks($directory = "uploads/")
+{
+    $now = time();
+    foreach (listChunkUploads($directory) as $chunkDir) {
+        $lastActivity = filemtime($chunkDir);
+        foreach (array('data.part', 'meta.json') as $file) {
+            if (is_file($chunkDir . $file)) {
+                $lastActivity = max($lastActivity, filemtime($chunkDir . $file));
+            }
+        }
+        if ($now - $lastActivity > STALE_CHUNK_AGE) {
+            removeChunkUpload($chunkDir, true);
+        }
+    }
+}
+
+// Verrou exclusif sur le stockage (réservation de place, finalisation des envois)
+function acquireStorageLock($directory = "uploads/")
+{
+    $handle = fopen($directory . STORAGE_LOCK_FILE, 'c');
+    if ($handle !== false) {
+        flock($handle, LOCK_EX);
+    }
+    return $handle;
+}
+
+function releaseStorageLock($handle)
+{
+    if ($handle) {
+        flock($handle, LOCK_UN);
+        fclose($handle);
+    }
+}
+
+function formatMegabytes($bytes)
+{
+    return round($bytes / 1024 / 1024, 1) . ' Mo';
 }
 
 // Suppression "sans trace" d'un fichier : écrase le contenu avec des octets aléatoires,
@@ -179,6 +364,11 @@ function clearAllFiles($directory = "uploads/")
     $metaFile = $directory . EXPIRY_META_FILE;
     if (is_file($metaFile)) {
         secureDelete($metaFile);
+    }
+
+    // Et les envois en cours
+    foreach (listChunkUploads($directory) as $chunkDir) {
+        removeChunkUpload($chunkDir, true);
     }
 
     return $deletedCount;

@@ -454,6 +454,44 @@ p {
     font-weight: 500;
 }
 
+/* Barre de progression de l'envoi, le long du bord inférieur */
+.tn-file {
+    position: relative;
+    overflow: hidden;
+}
+
+.tn-file-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: var(--surface-strong);
+    opacity: 0;
+    transition: opacity 0.2s var(--ease);
+}
+
+.tn-file-progress > span {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--ink);
+    transition: width 0.2s linear;
+}
+
+.tn-file.is-uploading .tn-file-progress {
+    opacity: 1;
+}
+
+.tn-file.is-uploading .tn-file-trigger {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.tn-file.is-uploading .tn-file-summary {
+    font-variant-numeric: tabular-nums;
+}
+
 /* --- Select custom (pastille) ------------------------------------------ */
 .tn-select {
     position: relative;

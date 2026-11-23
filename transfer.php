@@ -16,7 +16,6 @@ if (shouldCleanFiles()) {
 $uploadErrors = isset($_SESSION['upload_errors']) ? $_SESSION['upload_errors'] : array();
 unset($_SESSION['upload_errors']);
 
-$uploadLimits = getUploadLimits();
 $now = time();
 
 // Liste des fichiers avec leur date d'envoi, leur durée de conservation et leur expiration
@@ -59,6 +58,9 @@ foreach ($items as $item) {
 usort($files, function ($a, $b) {
     return $b['time'] - $a['time'];
 });
+
+// Espace occupé (éléments stockés + envois en cours) sur le quota total
+$storageUsed = min(STORAGE_QUOTA, getStoredBytes($directory) + getPendingBytes($directory));
 
 // Date d'envoi, à la minute près (pas de secondes qui défilent)
 function formatTimeAgo($timestamp)
@@ -121,7 +123,7 @@ function formatSize($bytes)
 function renderRetentionSelect($id, $extraClass = '')
 {
     $options = RETENTION_OPTIONS;
-    $default = DEFAULT_RETENTION;
+    $default = getSessionRetentionKey();
     ob_start(); ?>
     <div class="tn-select <?php echo $extraClass; ?>" data-sync="retention">
         <input type="hidden" name="retention" value="<?php echo $default; ?>">
@@ -186,18 +188,19 @@ function renderRetentionSelect($id, $extraClass = '')
             <?php endif; ?>
             <div id="uploadClientError" class="tn-alert" hidden></div>
             <div class="drop-zone" id="dropZone">
-                <form action="upload.php" method="POST" enctype="multipart/form-data" id="uploadForm">
+                <form id="uploadForm">
                     <p class="drop-zone-title">Glissez-déposez vos fichiers ici</p>
                     <?php echo renderRetentionSelect('retentionFiles', 'tn-select--center'); ?>
                     <div class="tn-file" id="filePicker">
-                        <input type="file" name="files[]" id="fileInput" multiple class="tn-visually-hidden">
+                        <input type="file" id="fileInput" multiple class="tn-visually-hidden">
                         <label for="fileInput" class="tn-btn tn-btn-primary tn-file-trigger">Sélectionner des fichiers</label>
                         <span class="tn-file-summary" id="fileSummary">Envoi automatique dès la sélection</span>
+                        <span class="tn-file-progress" aria-hidden="true"><span id="fileProgress"></span></span>
                     </div>
                 </form>
                 <small class="drop-zone-hint">
-                    Max <?php echo round($uploadLimits['file'] / 1024 / 1024, 1); ?> Mo par fichier
-                    · <?php echo round($uploadLimits['post'] / 1024 / 1024, 1); ?> Mo au total
+                    <?php echo formatMegabytes($storageUsed); ?> utilisés sur <?php echo formatMegabytes(STORAGE_QUOTA); ?>
+                    · <?php echo formatMegabytes(STORAGE_QUOTA - $storageUsed); ?> disponibles
                 </small>
             </div>
         </div>
@@ -298,11 +301,12 @@ function renderRetentionSelect($id, $extraClass = '')
     <script src="assets/ui.js"></script>
 
     <script>
-        // Limites d'upload, synchronisées avec la config PHP du serveur (upload_max_filesize / post_max_size)
-        const MAX_FILE_SIZE = <?php echo (int) $uploadLimits['file']; ?>;
-        const MAX_TOTAL_SIZE = <?php echo (int) $uploadLimits['post']; ?>;
-        // Marge de sécurité pour les en-têtes multipart et les autres champs du formulaire
-        const UPLOAD_SAFETY_MARGIN = 64 * 1024;
+        // Quota de stockage total et taille des morceaux (sous les limites du serveur)
+        const STORAGE_QUOTA = <?php echo (int) STORAGE_QUOTA; ?>;
+        const STORAGE_USED = <?php echo (int) $storageUsed; ?>;
+        const CHUNK_SIZE = <?php echo (int) getChunkSize(); ?>;
+        const CSRF_TOKEN = <?php echo json_encode(getCsrfToken()); ?>;
+        const UPLOAD_ERRORS_KEY = 'tn-upload-errors';
         // Décalage entre l'horloge du serveur et celle du navigateur
         const CLOCK_OFFSET = <?php echo $now; ?> * 1000 - Date.now();
 
@@ -316,6 +320,15 @@ function renderRetentionSelect($id, $extraClass = '')
         // --- Selects de durée (synchronisés entre les deux formulaires) ------
         document.querySelectorAll('.tn-select').forEach(el => TN.select(el));
 
+        // Mémorise la durée choisie dans la session (conservée jusqu'à la déconnexion)
+        document.querySelectorAll('.tn-select[data-sync="retention"]').forEach(el => {
+            el.addEventListener('tn:change', (e) => {
+                const body = new FormData();
+                body.append('retention', e.detail.value);
+                fetch('save_retention.php', { method: 'POST', body: body, credentials: 'same-origin', keepalive: true }).catch(() => {});
+            });
+        });
+
         // --- Envoi de fichiers -----------------------------------------------
         const uploadForm = document.getElementById('uploadForm');
         const uploadClientError = document.getElementById('uploadClientError');
@@ -323,41 +336,140 @@ function renderRetentionSelect($id, $extraClass = '')
         const fileInput = document.getElementById('fileInput');
         const filePicker = document.getElementById('filePicker');
         const fileSummary = document.getElementById('fileSummary');
+        const fileProgress = document.getElementById('fileProgress');
         const defaultSummary = fileSummary.textContent;
+        let uploading = false;
 
-        function showUploadError(message) {
-            uploadClientError.textContent = message;
+        function showUploadError(messages) {
+            uploadClientError.replaceChildren(...[].concat(messages).map(message => {
+                const line = document.createElement('div');
+                line.textContent = message;
+                return line;
+            }));
             uploadClientError.hidden = false;
         }
 
         function clearUploadError() {
             uploadClientError.hidden = true;
-            uploadClientError.textContent = '';
+            uploadClientError.replaceChildren();
         }
 
-        // Vérifie que la sélection respecte les limites du serveur avant tout envoi
-        function validateFiles(fileList) {
-            const files = Array.from(fileList);
+        // Erreurs de l'envoi précédent, conservées pendant le rechargement de la page
+        const pendingErrors = sessionStorage.getItem(UPLOAD_ERRORS_KEY);
+        if (pendingErrors) {
+            sessionStorage.removeItem(UPLOAD_ERRORS_KEY);
+            try {
+                showUploadError(JSON.parse(pendingErrors));
+            } catch (e) {}
+        }
+
+        // Vérifie que la sélection tient dans l'espace disponible avant tout envoi
+        function validateFiles(files) {
             if (files.length === 0) {
                 return "Sélectionnez au moins un fichier avant d'envoyer.";
             }
 
-            const tooLarge = files.find(f => f.size > MAX_FILE_SIZE);
+            const tooLarge = files.find(f => f.size > STORAGE_QUOTA);
             if (tooLarge) {
-                return `"${tooLarge.name}" (${formatMB(tooLarge.size)}) dépasse la taille maximale autorisée par fichier (${formatMB(MAX_FILE_SIZE)}).`;
+                return `"${tooLarge.name}" (${formatMB(tooLarge.size)}) dépasse la limite de ${formatMB(STORAGE_QUOTA)}.`;
             }
 
             const totalSize = files.reduce((sum, f) => sum + f.size, 0);
-            if (totalSize > MAX_TOTAL_SIZE - UPLOAD_SAFETY_MARGIN) {
-                return `Le volume total sélectionné (${formatMB(totalSize)}) dépasse la limite du serveur (${formatMB(MAX_TOTAL_SIZE)}). Envoyez moins de fichiers à la fois.`;
+            const available = Math.max(0, STORAGE_QUOTA - STORAGE_USED);
+            if (totalSize > available) {
+                return `Espace insuffisant : ${formatMB(totalSize)} sélectionnés pour ${formatMB(available)} disponibles (limite de ${formatMB(STORAGE_QUOTA)} au total). Supprimez des éléments ou envoyez moins de fichiers.`;
             }
 
             return null;
         }
 
-        // Valide puis envoie une sélection de fichiers ; sinon affiche l'erreur et n'envoie rien
-        function trySubmitFiles(fileList) {
-            const error = validateFiles(fileList);
+        function randomUploadId() {
+            const bytes = crypto.getRandomValues(new Uint8Array(16));
+            return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // Envoie un morceau ; XHR plutôt que fetch pour suivre la progression
+        function postChunk(fields, blob, onProgress) {
+            return new Promise((resolve, reject) => {
+                const body = new FormData();
+                Object.keys(fields).forEach(key => body.append(key, fields[key]));
+                body.append('chunk', blob, 'chunk');
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', 'upload_chunk.php');
+                xhr.upload.addEventListener('progress', e => onProgress(Math.min(e.loaded, blob.size)));
+                xhr.addEventListener('load', () => {
+                    let data = {};
+                    try {
+                        data = JSON.parse(xhr.responseText) || {};
+                    } catch (e) {}
+                    resolve({ status: xhr.status, data: data });
+                });
+                xhr.addEventListener('error', () => reject(new Error('connexion interrompue')));
+                xhr.send(body);
+            });
+        }
+
+        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Envoie un fichier morceau par morceau, avec reprise en cas de coupure
+        async function uploadFile(file, retention, onProgress) {
+            const id = randomUploadId();
+            let offset = 0;
+            let attempts = 0;
+
+            for (;;) {
+                const blob = file.slice(offset, offset + CHUNK_SIZE);
+                const fields = {
+                    csrf_token: CSRF_TOKEN,
+                    upload_id: id,
+                    name: file.name,
+                    size: file.size,
+                    offset: offset,
+                    retention: retention,
+                };
+                const start = offset;
+                let res = null;
+                try {
+                    res = await postChunk(fields, blob, loaded => onProgress(start + loaded));
+                } catch (e) {}
+
+                if (res && res.status === 200) {
+                    if (res.data.done) return;
+                    offset = res.data.received;
+                    attempts = 0;
+                    continue;
+                }
+
+                // Le serveur indique où reprendre (morceau perdu ou déjà reçu)
+                if (res && res.status === 409 && typeof res.data.received === 'number') {
+                    offset = res.data.received;
+                } else if (res && res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+                    // Refus définitif (quota, session expirée...) : inutile de réessayer
+                    throw new Error(res.data.error || (res.status === 413 ? 'refusé par le serveur (morceau trop volumineux)' : `erreur ${res.status}`));
+                }
+
+                // Coupure réseau ou erreur serveur passagère : quelques nouveaux essais
+                if (++attempts > 4) {
+                    throw new Error(res && res.data.error ? res.data.error : 'connexion interrompue');
+                }
+                await sleep(1000 * attempts);
+            }
+        }
+
+        function setProgress(ratio) {
+            fileProgress.style.width = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(1) + '%';
+        }
+
+        // Valide puis envoie une sélection de fichiers, l'un après l'autre
+        async function trySubmitFiles(fileList) {
+            if (uploading) {
+                showUploadError('Un envoi est déjà en cours, patientez jusqu\'à la fin.');
+                return;
+            }
+
+            const files = Array.from(fileList);
+            const error = validateFiles(files);
             if (error) {
                 fileInput.value = '';
                 fileSummary.textContent = defaultSummary;
@@ -365,15 +477,51 @@ function renderRetentionSelect($id, $extraClass = '')
                 showUploadError(error);
                 return;
             }
+
             clearUploadError();
-            if (fileInput.files !== fileList) {
-                fileInput.files = fileList;
+            uploading = true;
+            fileInput.disabled = true;
+            filePicker.classList.add('has-files', 'is-uploading');
+
+            const retention = uploadForm.querySelector('input[name="retention"]').value;
+            const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+            const errors = [];
+            let doneSize = 0;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const prefix = files.length > 1 ? `${i + 1}/${files.length} · ` : '';
+                const update = loaded => {
+                    const ratio = totalSize > 0 ? (doneSize + loaded) / totalSize : 1;
+                    setProgress(ratio);
+                    fileSummary.textContent = `${Math.floor(ratio * 100)} % · ${prefix}${file.name}`;
+                };
+                update(0);
+                try {
+                    await uploadFile(file, retention, update);
+                } catch (e) {
+                    errors.push(`${file.name} : ${e.message}`);
+                }
+                doneSize += file.size;
             }
-            const count = fileList.length;
-            fileSummary.textContent = `Envoi de ${count > 1 ? count + ' fichiers' : fileList[0].name}…`;
-            filePicker.classList.add('has-files');
-            uploadForm.submit();
+
+            setProgress(1);
+            uploading = false;
+            if (errors.length > 0) {
+                sessionStorage.setItem(UPLOAD_ERRORS_KEY, JSON.stringify(errors));
+            }
+            window.location.replace('transfer.php');
         }
+
+        uploadForm.addEventListener('submit', e => e.preventDefault());
+
+        // Avertit avant de quitter la page pendant un envoi
+        window.addEventListener('beforeunload', (e) => {
+            if (uploading) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
 
         // Sélection via le bouton : envoi immédiat, comme le glisser-déposer
         fileInput.addEventListener('change', () => {
