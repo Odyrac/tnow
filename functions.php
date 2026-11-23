@@ -50,6 +50,22 @@ function rememberRetentionKey($key)
     }
 }
 
+// Onglet ouvert (fichiers / texte), conservé jusqu'à la déconnexion
+const TABS = array('files', 'text');
+
+function getSessionTab()
+{
+    $tab = isset($_SESSION['tab']) ? $_SESSION['tab'] : null;
+    return in_array($tab, TABS, true) ? $tab : TABS[0];
+}
+
+function rememberTab($tab)
+{
+    if (in_array($tab, TABS, true)) {
+        $_SESSION['tab'] = $tab;
+    }
+}
+
 // Libellé lisible d'une durée de conservation (ex : 43200 => "12 heures")
 function retentionLabel($seconds)
 {

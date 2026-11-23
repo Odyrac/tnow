@@ -23,6 +23,7 @@
         host.appendChild(track);
 
         let scrollingTimer = null;
+        let frame = 0;
 
         function viewport() {
             return isPage ? window.innerHeight : scroller.clientHeight;
@@ -47,13 +48,25 @@
             }
             track.classList.remove('is-hidden');
             const m = metrics();
-            const top = m.maxScroll > 0 ? (scroller.scrollTop / m.maxScroll) * m.maxTop : 0;
+            // Rebond iOS : scrollTop sort de [0, maxScroll], le curseur reste dans son rail
+            const scrollTop = Math.min(Math.max(scroller.scrollTop, 0), m.maxScroll);
+            const top = m.maxScroll > 0 ? (scrollTop / m.maxScroll) * m.maxTop : 0;
             thumb.style.height = m.thumbHeight + 'px';
-            thumb.style.transform = 'translateY(' + top + 'px)';
+            thumb.style.transform = 'translate3d(0,' + top + 'px,0)';
+        }
+
+        // Une seule mise à jour par image (iOS envoie des rafales de scroll / resize)
+        function scheduleUpdate() {
+            if (!frame) {
+                frame = requestAnimationFrame(() => {
+                    frame = 0;
+                    update();
+                });
+            }
         }
 
         function onScroll() {
-            update();
+            scheduleUpdate();
             track.classList.add('is-scrolling');
             clearTimeout(scrollingTimer);
             scrollingTimer = setTimeout(() => track.classList.remove('is-scrolling'), 700);
@@ -99,9 +112,9 @@
         });
 
         (isPage ? window : scroller).addEventListener('scroll', onScroll, { passive: true });
-        window.addEventListener('resize', update);
+        window.addEventListener('resize', scheduleUpdate);
         if ('ResizeObserver' in window) {
-            const ro = new ResizeObserver(update);
+            const ro = new ResizeObserver(scheduleUpdate);
             ro.observe(isPage ? document.body : scroller);
         }
         if (!isPage) {
@@ -117,6 +130,9 @@
         const buttons = Array.from(root.querySelectorAll('.tn-tab'));
 
         function activate(index, focus) {
+            if (root.dataset.active !== String(index)) {
+                root.dispatchEvent(new CustomEvent('tn:change', { detail: { index: index, id: buttons[index].getAttribute('aria-controls') } }));
+            }
             root.dataset.active = String(index);
             buttons.forEach((btn, i) => {
                 const panel = document.getElementById(btn.getAttribute('aria-controls'));

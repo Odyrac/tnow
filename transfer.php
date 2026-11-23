@@ -171,22 +171,25 @@ function renderRetentionSelect($id, $extraClass = '')
             <h2>Transfer Now</h2>
         </div>
 
-        <div class="tn-tabs" role="tablist" data-active="0">
+        <!-- Erreurs d'envoi : au-dessus des onglets pour rester visibles quel que soit l'onglet ouvert -->
+        <?php if (!empty($uploadErrors)): ?>
+            <div class="tn-alert">
+                <?php foreach ($uploadErrors as $uploadError): ?>
+                    <div><?php echo htmlspecialchars($uploadError); ?></div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+        <div id="uploadClientError" class="tn-alert" hidden></div>
+
+        <?php $textTab = getSessionTab() === 'text'; ?>
+        <div class="tn-tabs" role="tablist" data-active="<?php echo $textTab ? 1 : 0; ?>">
             <span class="tn-tabs-indicator" aria-hidden="true"></span>
-            <button class="tn-tab" id="files-tab" type="button" role="tab" aria-selected="true" aria-controls="files">Fichiers</button>
-            <button class="tn-tab" id="text-tab" type="button" role="tab" aria-selected="false" aria-controls="text" tabindex="-1">Texte</button>
+            <button class="tn-tab" id="files-tab" type="button" role="tab" aria-selected="<?php echo $textTab ? 'false' : 'true'; ?>" aria-controls="files" <?php echo $textTab ? 'tabindex="-1"' : ''; ?>>Fichiers</button>
+            <button class="tn-tab" id="text-tab" type="button" role="tab" aria-selected="<?php echo $textTab ? 'true' : 'false'; ?>" aria-controls="text" <?php echo $textTab ? '' : 'tabindex="-1"'; ?>>Texte</button>
         </div>
 
         <!-- Onglet Fichiers -->
-        <div class="tn-panel" id="files" role="tabpanel" aria-labelledby="files-tab">
-            <?php if (!empty($uploadErrors)): ?>
-                <div class="tn-alert">
-                    <?php foreach ($uploadErrors as $uploadError): ?>
-                        <div><?php echo htmlspecialchars($uploadError); ?></div>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
-            <div id="uploadClientError" class="tn-alert" hidden></div>
+        <div class="tn-panel" id="files" role="tabpanel" aria-labelledby="files-tab" <?php echo $textTab ? 'hidden' : ''; ?>>
             <div class="drop-zone" id="dropZone">
                 <form id="uploadForm">
                     <p class="drop-zone-title">Glissez-déposez vos fichiers ici</p>
@@ -198,15 +201,11 @@ function renderRetentionSelect($id, $extraClass = '')
                         <span class="tn-file-progress" aria-hidden="true"><span id="fileProgress"></span></span>
                     </div>
                 </form>
-                <small class="drop-zone-hint">
-                    <?php echo formatMegabytes($storageUsed); ?> utilisés sur <?php echo formatMegabytes(STORAGE_QUOTA); ?>
-                    · <?php echo formatMegabytes(STORAGE_QUOTA - $storageUsed); ?> disponibles
-                </small>
             </div>
         </div>
 
         <!-- Onglet Texte -->
-        <div class="tn-panel" id="text" role="tabpanel" aria-labelledby="text-tab" hidden>
+        <div class="tn-panel" id="text" role="tabpanel" aria-labelledby="text-tab" <?php echo $textTab ? '' : 'hidden'; ?>>
             <form action="save_text.php" method="POST" id="textForm">
                 <div class="tn-textarea-wrap">
                     <textarea class="tn-input tn-textarea" id="textContent" name="content" required placeholder="Collez votre texte ici..."></textarea>
@@ -277,6 +276,7 @@ function renderRetentionSelect($id, $extraClass = '')
                     <?php endif; ?>
                 <?php endforeach; ?>
             </div>
+            <p class="tn-storage"><?php echo formatSize($storageUsed); ?> / <?php echo formatMegabytes(STORAGE_QUOTA); ?></p>
         <?php endif; ?>
 
         <form action="logout.php" method="POST" class="card-footer">
@@ -314,19 +314,22 @@ function renderRetentionSelect($id, $extraClass = '')
             return (bytes / 1024 / 1024).toFixed(1) + ' Mo';
         }
 
+        // Préférences gardées dans la session jusqu'à la déconnexion (durée, onglet)
+        function savePreference(name, value) {
+            const body = new FormData();
+            body.append(name, value);
+            fetch('save_preferences.php', { method: 'POST', body: body, credentials: 'same-origin', keepalive: true }).catch(() => {});
+        }
+
         // --- Onglets ---------------------------------------------------------
-        TN.tabs(document.querySelector('.tn-tabs'));
+        const tabsRoot = document.querySelector('.tn-tabs');
+        TN.tabs(tabsRoot);
+        tabsRoot.addEventListener('tn:change', (e) => savePreference('tab', e.detail.id));
 
         // --- Selects de durée (synchronisés entre les deux formulaires) ------
         document.querySelectorAll('.tn-select').forEach(el => TN.select(el));
-
-        // Mémorise la durée choisie dans la session (conservée jusqu'à la déconnexion)
         document.querySelectorAll('.tn-select[data-sync="retention"]').forEach(el => {
-            el.addEventListener('tn:change', (e) => {
-                const body = new FormData();
-                body.append('retention', e.detail.value);
-                fetch('save_retention.php', { method: 'POST', body: body, credentials: 'same-origin', keepalive: true }).catch(() => {});
-            });
+            el.addEventListener('tn:change', (e) => savePreference('retention', e.detail.value));
         });
 
         // --- Envoi de fichiers -----------------------------------------------
